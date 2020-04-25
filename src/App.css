@@ -28,6 +28,30 @@
   color: #61dafb;
 }
 
+.highlight {
+  font-weight: bold;
+}
+
+.typeahead-selections {
+  display: flex;
+  flex-direction: row;
+}
+
+.typeahead-selection {
+  background-color: lightblue;
+  display: block;
+  border: 1px solid blue;
+  border-radius: 2px;
+  padding: 5px;
+  margin: 0 10px;
+  cursor: pointer;
+}
+
+.typeahead-menu {
+  max-width: 200px;
+  border: 1px solid black;
+}
+
 @keyframes App-logo-spin {
   from {
     transform: rotate(0deg);
