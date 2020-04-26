@@ -1,19 +1,45 @@
 import React, { useEffect, useState, useCallback, memo } from 'react';
 import './App.css';
 
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedValue(value)
+    }, delay);
+
+    return () => clearTimeout(timeout);
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
+const mockBackend = async (fn, delay, errorRate, error) => {
+  const [res] = await Promise.all([
+    fn(), 
+    new Promise(resolve => setTimeout(resolve, delay)),
+  ]);
+
+  if (errorRate && Math.random() < errorRate) throw error;
+
+  return res;
+}
+
 const Typeahead = memo((props) => {
   const { options } = props;
   const [displayedOptions, setDisplayedOptions] = useState(options);
   const [filterValue, setFilterValue] = useState(null);
+  const debouncedFilterValue = useDebounce(filterValue, 500);
   const [selectedItems, setSelectedItems] = useState([]);
-  const [inputFocused, setInputFocused] = useState(false);
+  const [inputFocused, setInputFocused] = useState(true);
 
   useEffect(() => {
     setDisplayedOptions(
-      filterValue && options.filter(({option}) => option.toLowerCase().includes(filterValue)) ||
+      debouncedFilterValue && options.filter(({option}) => option.toLowerCase().includes(debouncedFilterValue)) ||
       options,
     );
-  }, [options, filterValue]);
+  }, [options, debouncedFilterValue]);
 
   const filterCountries = useCallback((value) => {
     setFilterValue(value.toLowerCase());
@@ -42,7 +68,7 @@ const Typeahead = memo((props) => {
       <TypeaheadInput filterCountries={filterCountries} focusInput={focusInput} />
       {inputFocused && <TypeaheadMenu 
         options={displayedOptions} 
-        filterValue={filterValue}
+        filterValue={debouncedFilterValue}
         selectItem={selectItem} 
       />}
     </div>
@@ -53,21 +79,23 @@ const TypeaheadSelections = memo((props) => {
   const { selectedItems, removeSelection } = props;
 
   const handleRemoval = useCallback((item) => () => removeSelection(item), [removeSelection]);
-  return <ul className="typeahead-selections">{
-    selectedItems.map(item => 
-      <li 
-        key={item} 
-        onClick={handleRemoval(item)}
-        className="typeahead-selection"
+  return <ul className="typeahead-selections">
+    {
+      selectedItems.map(item => 
+        <li 
+          key={item} 
+          onClick={handleRemoval(item)}
+          className="typeahead-selection"
         >
           <span>{item}</span>
-      </li>)
-  }</ul>;
+        </li>)
+    }
+  </ul>;
 })
 
 const TypeaheadInput = memo((props) => {
   const { filterCountries, focusInput } = props;
-  const handleChange = useCallback(e => filterCountries(e.target.value), []);
+  const handleChange = useCallback(e => filterCountries(e.target.value), [filterCountries]);
 
   const handleFocus = useCallback(focused => () => focusInput(focused), [focusInput]);
 
@@ -100,7 +128,7 @@ const TypeaheadMenu = memo((props) => {
 const TypeaheadMenuItem = memo((props) => {
   const { option, filterValue, selectItem } = props;
 
-  const handleSelect = useCallback(() => selectItem(option), [selectItem]);
+  const handleSelect = useCallback(() => selectItem(option), [selectItem, option]);
 
   return <li key={option} onClick={handleSelect}>{
     split(option, filterValue).map((v, i) => <span key={i} className={i%2 && 'highlight'}>{v}</span>)
@@ -109,17 +137,25 @@ const TypeaheadMenuItem = memo((props) => {
 
 function App() {
   const [ countries, setCountries ] = useState([]);
+  const [ error, setError ] = useState(null);
 
   async function fetchCountries() {
-    const resp = await fetch('https://raw.githubusercontent.com/samayo/country-json/master/src/country-by-name.json');
-
-    const json = await resp.json();
-    setCountries(json.map(({country}) => ({option: country})));
+    try {
+      const json = await mockBackend(async () => {
+        const resp = await fetch('https://raw.githubusercontent.com/samayo/country-json/master/src/country-by-name.json');
+        return await resp.json();
+      }, 1000, .1, 'MEH!');
+      setCountries(json.map(({country}) => ({option: country})));
+    } catch (e) {
+      setError(e);
+    }
   }
 
   useEffect(() => {
     fetchCountries();
   }, []);
+
+  if (error) return <div>{error}</div>;
 
   return (
     <Typeahead options={countries} />
