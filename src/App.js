@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, memo } from 'react';
+import React, { useEffect, useState, useCallback, memo, cloneElement } from 'react';
 import './App.css';
 
 const useDebounce = (value, delay) => {
@@ -27,7 +27,7 @@ const mockBackend = async (fn, delay, errorRate, error) => {
 }
 
 const Typeahead = memo((props) => {
-  const { options } = props;
+  const { options, renderItem } = props;
   const [displayedOptions, setDisplayedOptions] = useState(options);
   const [filterValue, setFilterValue] = useState(null);
   const debouncedFilterValue = useDebounce(filterValue, 500);
@@ -69,7 +69,8 @@ const Typeahead = memo((props) => {
       {inputFocused && <TypeaheadMenu 
         options={displayedOptions} 
         filterValue={debouncedFilterValue}
-        selectItem={selectItem} 
+        selectItem={selectItem}
+        renderItem={renderItem}
       />}
     </div>
   );
@@ -110,7 +111,7 @@ const TypeaheadInput = memo((props) => {
 })
 
 const TypeaheadMenu = memo((props) => {
-  const { filterValue, options, selectItem } = props;
+  const { filterValue, options, selectItem, renderItem } = props;
 
   return (
     <ul>
@@ -120,19 +121,18 @@ const TypeaheadMenu = memo((props) => {
           option={option} 
           filterValue={filterValue}
           selectItem={selectItem}
+          renderItem={renderItem}
         />)}
     </ul>
   );
 })
 
 const TypeaheadMenuItem = memo((props) => {
-  const { option, filterValue, selectItem } = props;
+  const { option, filterValue, selectItem, renderItem } = props;
 
   const handleSelect = useCallback(() => selectItem(option), [selectItem, option]);
 
-  return <li key={option} onClick={handleSelect}>{
-    split(option, filterValue).map((v, i) => <span key={i} className={i%2 && 'highlight'}>{v}</span>)
-  }</li>;
+  return cloneElement(renderItem(option, split(option, filterValue)), { onClick: handleSelect });
 })
 
 function App() {
@@ -158,7 +158,12 @@ function App() {
   if (error) return <div>{error}</div>;
 
   return (
-    <Typeahead options={countries} />
+    <Typeahead
+      options={countries}
+      renderItem={(option, highlights) => <li key={option}>{
+        highlights.map((v, i) => <span key={i} className={i%2 && 'highlight'}>{v}</span>)
+      }</li>}
+    />
   );
 }
 
